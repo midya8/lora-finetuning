@@ -61,6 +61,24 @@ python -m loralab.predictive_rank --verify --input report.json
 bash examples/verify_rank_wheel.sh
 ```
 
+## Common-mode training regressions
+
+The exact-rank checks above cover probability functions, not training. A separate
+regression suite checks one special symmetry of ordinary factor SGD: adding the
+same row vector `v` to every row of `B`. Raw logits shift by `v @ A @ x`, while
+softmax probabilities and cross-entropy stay fixed. The class errors sum to zero,
+so both factor gradients stay fixed; after the update, the same common row
+vector still separates the two output factors. This does not hold for arbitrary
+factor gauges or for a change to only one class row.
+
+The checks cover all 124 archived states at zero and positive learning rates,
+12 selected full batches, 36 generated shapes through three steps, and 24 actual
+online updates at each original width. They check raw-logit offsets, both factor
+gradients, updated factors and probabilities, with noncommon-shift failure
+controls. These are finite binary64 regression checks, not a proof of all
+optimizer implementations, an independent correctness certificate or a new
+training result. The original trainer, archive and rank certificates are unchanged.
+
 ## CLI
 
 From a checkout, create an isolated environment before running the commands:
@@ -103,7 +121,7 @@ python -m loralab coordinates --input problem.json --gauge-scale 4
 
 ## Limitations
 
-The base model is a linear classifier over hashed bag-of-words, not a transformer; the point is the adaptation mechanics (frozen base, low-rank factors, merge equivalence, cost/retention accounting), which apply to compatible linear layers, while parameter savings depend on shape. The fixture is synthetic and small so the suite runs deterministically in seconds; the retention behavior above is a property of this fixture, not a benchmark claim about LoRA in general.
+The base model is a linear classifier over hashed bag-of-words, not a transformer; the point is the adaptation mechanics (frozen base, low-rank factors, merge equivalence, cost/retention accounting), which apply to compatible linear layers, while parameter savings depend on shape. The fixture is synthetic and small; the deterministic suite includes full archive regeneration and can take over a minute; the retention behavior above is a property of this fixture, not a benchmark claim about LoRA in general.
 
 ## License
 
