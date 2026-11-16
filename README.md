@@ -108,7 +108,7 @@ python -m unittest discover -s tests
 
 The Python suite checks training, coordinate identities, exact-rank certificates and independent verification. Node and actual-Chrome tests compare full witnesses and every archived rank report, reject malformed input, and replay browser exports through the native verifier. Responsive checks cover both inspectors.
 
-No runtime dependencies beyond Python 3.10+. Web tests need Node 22+ and Chrome. The wheel scripts below install into temporary environments and check the packaged data outside the checkout.
+No runtime dependencies beyond Python 3.10+. Web tests need Node 22+ and Chrome. The wheel scripts below install into temporary environments and check the packaged data outside the checkout. `verify_wheel.sh` also copies the unchanged Python tests there and runs the complete discovered suite against the installed wheel. It checks all 12 module origins before and after the run. The only checkout-relative package path copied beside the tests is an inert JSON fixture, with no Python implementation files.
 
 ```bash
 node --test tests/test_coordinates.cjs tests/test_coordinates_browser.cjs tests/test_rank.cjs tests/test_rank_browser.cjs
