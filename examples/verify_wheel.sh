@@ -6,7 +6,46 @@ trap 'rm -rf "$tmp"' EXIT
 python -m pip wheel --no-deps "$root" --wheel-dir "$tmp/wheels" >/dev/null
 python -m venv "$tmp/venv"
 "$tmp/venv/bin/python" -m pip install --no-index "$tmp"/wheels/*.whl >/dev/null
+# Copy tests, not implementation files, so subprocess imports use the wheel too.
+cp -R "$root/tests" "$tmp/tests"
+find "$tmp/tests" -type d -name __pycache__ -prune -exec rm -rf {} +
+# One original test reads this exact fixture by checkout-relative path. Keep only
+# its inert data, never a second importable copy of the package implementation.
+mkdir -p "$tmp/loralab/rank_data"
+cp "$root/loralab/rank_data/9-rank-witnesses.json" "$tmp/loralab/rank_data/"
 cd "$tmp"
+"$tmp/venv/bin/python" - <<'CHECK'
+import importlib
+import pathlib
+import sys
+import unittest
+
+modules = [
+    'loralab', 'loralab.cli', 'loralab.data', 'loralab.eval', 'loralab.lora',
+    'loralab.model', 'loralab.coordinates', 'loralab.coordinate_fixtures',
+    'loralab.coordinate_report', 'loralab.predictive_rank',
+    'loralab.rank_fixtures', 'loralab.rank_verify',
+]
+prefix = pathlib.Path(sys.prefix).resolve()
+
+def check_origins():
+    for name in modules:
+        origin = pathlib.Path(importlib.import_module(name).__file__).resolve()
+        assert prefix in origin.parents, (name, origin, prefix)
+    print(f'All {len(modules)} module origins are inside the wheel environment',
+          flush=True)
+
+check_origins()
+suite = unittest.defaultTestLoader.discover('tests', top_level_dir='.')
+count = suite.countTestCases()
+assert count > 0, 'No installed tests were discovered'
+result = unittest.TextTestRunner(verbosity=2).run(suite)
+assert result.testsRun == count, (result.testsRun, count)
+assert result.wasSuccessful(), 'Installed suite failed'
+assert not result.skipped, result.skipped
+check_origins()
+print(f'All {count} unchanged Python tests passed outside the checkout', flush=True)
+CHECK
 "$tmp/venv/bin/python" -m loralab evaluate --format json > evaluate.json
 "$tmp/venv/bin/python" -m loralab trajectory > trajectory.json
 "$tmp/venv/bin/python" -m loralab gates --min-base-drop .3 --min-adapted-accuracy .95 --max-rank2-param-share .7 --max-merge-diff 1e-12 > gates.txt
